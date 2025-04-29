@@ -222,12 +222,18 @@ async def get_clickables(serial: Optional[str] = None) -> Dict[str, Any]:
                 
                 # Count how many elements are actually tappable
                 tappable_count = len(tappable_elements)
+
+                # json formate output without the bound filed
+                nobound_elements = []
+                for element in flattened_elements:
+                    copy = {k: v for k, v in element.items() if (k != 'bounds')}
+                    nobound_elements.append(copy)
                 
                 # Add a short sleep to ensure UI is fully loaded/processed
                 await asyncio.sleep(0.5)  # 500ms sleep
                 
                 return {
-                    "clickable_elements": flattened_elements,
+                    "clickable_elements": nobound_elements,
                     "count": len(flattened_elements),
                     "tappable_count": tappable_count,
                     "tappable_indices": sorted(tappable_elements),
