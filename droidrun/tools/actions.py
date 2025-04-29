@@ -514,12 +514,90 @@ async def input_text(text: str, serial: Optional[str] = None) -> str:
             if not success:
                 return f"Error: Failed to input text chunk. Last error: {last_error}"
             
+            # result = await CheckInputResult(device, text)
+            # if not result: # TODO: add delay for the phone to refresh the ui elements
+            #     return f"Error: input failed, please tab and focus the edit text first!"
+
             # Small delay between chunks
             await asyncio.sleep(0.1)
         
         return f"Text input completed: {text}"
     except ValueError as e:
         return f"Error: {str(e)}"
+
+async def CheckInputResult(device: Device, target: str) -> bool: 
+    """
+    Check if the input text was successfully inputted.
+    
+    Args:
+        device: The adb device object
+        target: The target text to check
+    """
+    if not target and target.strip() == "":
+        return False
+    
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as temp:
+            local_path = temp.name
+    command = f'am broadcast -a com.droidrun.portal.GET_TEXT_ELEMENTS --es text "{target}"'
+
+    try:
+        # Clear logcat to make it easier to find our output
+        await device._adb.shell(device._serial, "logcat -c")
+        
+        # Trigger the custom service via broadcast to get ALL elements
+        await device._adb.shell(device._serial, command)
+        
+        # Poll for the JSON file path
+        start_time = asyncio.get_event_loop().time()
+        max_wait_time = 10  # Maximum wait time in seconds
+        poll_interval = 0.2  # Check every 200ms
+        
+        device_path = None
+        while asyncio.get_event_loop().time() - start_time < max_wait_time:
+            # Check logcat for the file path
+            logcat_output = await device._adb.shell(device._serial, "logcat -d \"DROIDRUN_FILE:E *:s\" | grep \"JSON data written to\" | tail -1")
+            
+            # Parse the file path if present
+            match = re.search(r"JSON data written to: (.*)", logcat_output)
+            if match:
+                device_path = match.group(1).strip()
+                break
+                
+            # Wait before polling again
+            await asyncio.sleep(poll_interval)
+        
+        # Check if we found the file path
+        if not device_path:
+            raise ValueError(f"Failed to find the JSON file path in logcat after {max_wait_time} seconds")
+            
+        # Pull the JSON file from the device
+        # await device._adb.pull_portal_file(device._serial, device_path, local_path, "com.droidrun.portal")
+        await device._adb.pull_file(device._serial, device_path, local_path)
+
+        # Read the JSON file
+        async with aiofiles.open(local_path, "r", encoding="utf-8") as f:
+            json_content = await f.read()
+            
+        # Clean up the temporary file
+        with contextlib.suppress(OSError):
+            os.unlink(local_path)
+        
+        # Try to parse the JSON
+        import json
+        try:
+            ui_data = json.loads(json_content)
+            if len(ui_data) == 0:
+                return False
+            return True
+            
+        except json.JSONDecodeError:
+            raise ValueError("Failed to parse UI elements JSON data")
+        
+    except Exception as e:
+        # Clean up in case of error
+        with contextlib.suppress(OSError):
+            os.unlink(local_path)
+        raise ValueError(f"Error retrieving target text elements: {e}")
 
 async def press_key(keycode: int, serial: Optional[str] = None) -> str:
     """
