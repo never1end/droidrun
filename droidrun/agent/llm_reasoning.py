@@ -14,6 +14,7 @@ from .providers import (
     AnthropicProvider,
     GeminiProvider,
     DeepSeekProvider,
+    AliYunProvider,
     OllamaProvider
 )
 
@@ -74,6 +75,7 @@ class LLMReasoner:
             "anthropic": AnthropicProvider,
             "gemini": GeminiProvider,
             "deepseek": DeepSeekProvider,
+            "aliyun": AliYunProvider,
             "ollama": OllamaProvider
         }.get(self.llm_provider)
         
