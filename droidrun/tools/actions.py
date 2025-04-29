@@ -493,6 +493,7 @@ async def input_text(text: str, serial: Optional[str] = None) -> str:
             
             # Try different input methods if one fails
             methods = [
+                f'app_process -Djava.class.path=/data/local/tmp/yadb /data/local/tmp com.ysbing.yadb.Main -keyboard "{escaped_chunk}"', # yadb input to input unicode
                 f'input text "{escaped_chunk}"',  # Standard method
                 f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped_chunk}"',  # Broadcast intent method
                 f'input keyboard text "{escaped_chunk}"'  # Keyboard method
